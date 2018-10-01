@@ -17,27 +17,38 @@
 # Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
+
 import os
 import sys
+import errno
 import argparse
+
 
 MAX_KEY_LENGTH		= 28
 DEV_BLOCK_PATH		= '/dev/block/'
 SYSFS_BCACHE_PATH	= '/sys/fs/bcache/'
 SYSFS_BLOCK_PATH	= '/sys/block/'
 
-def file_to_lines(fname):
-	try:
-		with open(fname, "r") as fd:
-			return fd.readlines()
-	except:
-		return []
 
-def file_to_line(fname):
-	ret = file_to_lines(fname)
-	if ret:
-		return ret[0].strip()
-	return ''
+def _file_to_lines(fname):
+    'read content of sysfs attribute file to lines'
+    try:
+        with open(fname, 'r') as fd:
+            return fd.readlines()
+    except IOError as e:
+        if (e[0] == errno.EPERM):
+            print('Permission denied: root privilege is required!', file=sys.stderr)
+            sys.exit(1)
+    except:
+        return []
+
+def _file_to_line(fname):
+    'read single line of sysfs attribute file'
+    lines = _file_to_lines(fname)
+    if lines:
+        return ret[0].strip()
+    return ''
+
 
 def str_to_bool(x):
 	return x == '1'
@@ -182,7 +193,7 @@ def dump_stats(sysfs_path, indent_str, stats):
 			continue
 		stat_data = {}
 		for attr in attrs:
-			val = file_to_line('%s/stats_%s/%s' % (sysfs_path, sysfs_name, attr))
+			val = _file_to_line('%s/stats_%s/%s' % (sysfs_path, sysfs_name, attr))
 			stat_data[attr] = val
 		for (display_name, str_func) in display:
 			d = '%s%s %s' % (indent_str, stat_display_name, display_name)
@@ -192,7 +203,7 @@ def get_cache_priority_stats(cache):
 	'''Retrieve priority stats from a cache.'''
 	attrs = {}
 
-	for line in file_to_lines('%s/priority_stats' % cache):
+	for line in _file_to_lines('%s/priority_stats' % cache):
 		x = line.split()
 		key = x[0]
 		value = x[1]
@@ -229,21 +240,21 @@ def dump_bcache(bcache_sysfs_path, stats, print_subdevices, device):
 		if not os.path.isdir('%s/%s' % (bcache_sysfs_path, obj)):
 			continue
 		if obj.startswith('cache'):
-			cache_size = int(file_to_line('%s/%s/../size' % (bcache_sysfs_path, obj)))
+			cache_size = int(_file_to_line('%s/%s/../size' % (bcache_sysfs_path, obj)))
 			cache_sectors += cache_size
 			cstats = get_cache_priority_stats('%s/%s' % (bcache_sysfs_path, obj))
 			unused_size = float(cstats['Unused'][:-1]) * cache_size / 100
 			cache_unused_sectors += unused_size
-			replacement_policies.add(file_to_line('%s/%s/cache_replacement_policy' % (bcache_sysfs_path, obj)))
+			replacement_policies.add(_file_to_line('%s/%s/cache_replacement_policy' % (bcache_sysfs_path, obj)))
 		elif obj.startswith('bdev'):
-			cache_modes.add(file_to_line('%s/%s/cache_mode' % (bcache_sysfs_path, obj)))
+			cache_modes.add(_file_to_line('%s/%s/cache_mode' % (bcache_sysfs_path, obj)))
 	cache_used_sectors = cache_sectors - cache_unused_sectors
 
 	# Dump basic stats
 	print("--- bcache ---")
 	for (sysfs_name, display_name, conversion_func) in attrs:
 		if sysfs_name is not None:
-			val = file_to_line('%s/%s' % (bcache_sysfs_path, sysfs_name))
+			val = _file_to_line('%s/%s' % (bcache_sysfs_path, sysfs_name))
 		else:
 			val = None
 		if conversion_func is not None:
@@ -277,7 +288,7 @@ def map_uuid_to_device():
 		if not os.path.islink(link):
 			continue
 		basename = os.path.basename(os.readlink(link))
-		ret[basename] = file_to_line('%s%s/dev' % (SYSFS_BLOCK_PATH, bdev))
+		ret[basename] = _file_to_line('%s%s/dev' % (SYSFS_BLOCK_PATH, bdev))
 	return ret
 
 
