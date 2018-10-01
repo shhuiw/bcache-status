@@ -280,71 +280,103 @@ def map_uuid_to_device():
 		ret[basename] = file_to_line('%s%s/dev' % (SYSFS_BLOCK_PATH, bdev))
 	return ret
 
+
+def _arg_parser():
+    'Contruct arg parser'
+
+    parser = argparse.ArgumentParser(add_help=False)
+
+    parser.add_argument('-h', '--help',
+                        help='Show this help message and exit',
+                        action='store_true')
+
+    parser.add_argument('--five-minute',
+                        help='Print the last five minutes of stats.',
+                        action='store_true')
+    parser.add_argument('--hour',
+                        help='Print the last hour of stats.',
+                        action='store_true')
+    parser.add_argument('--day',
+                        help='Print the last day of stats.',
+                        action='store_true')
+    parser.add_argument('--total',
+                        help='Print total stats.',
+                        action='store_true')
+    parser.add_argument('--all',
+                        help='Print all stats.',
+                        action='store_true')
+    parser.add_argument('--reset-stats',
+                        help='Reset stats after printing them.',
+                        action='store_true')
+
+    parser.add_argument('--sub-status',
+                        help='Print subdevice status.',
+                        action='store_true')
+
+    parser.add_argument('--gc',
+                        help='Invoke GC before printing status.',
+                        action='store_true')
+
+    return parser
+
+
 def main():
-	'''Main function'''
-	global SYSFS_BCACHE_PATH
-	global uuid_map
-	stats = set()
-	reset_stats = False
-	print_subdevices = False
-	run_gc = False
+    'entry point'
 
-	parser = argparse.ArgumentParser(add_help=False)
-	parser.add_argument('--help',			help='Show this help message and exit',		action='store_true')
-	parser.add_argument('-f', '--five-minute',	help='Print the last five minutes of stats.',	action='store_true')
-	parser.add_argument('-h', '--hour',		help='Print the last hour of stats.',		action='store_true')
-	parser.add_argument('-d', '--day',		help='Print the last day of stats.',		action='store_true')
-	parser.add_argument('-t', '--total',		help='Print total stats.',			action='store_true')
-	parser.add_argument('-a', '--all',		help='Print all stats.',			action='store_true')
-	parser.add_argument('-r', '--reset-stats',	help='Reset stats after printing them.',	action='store_true')
-	parser.add_argument('-s', '--sub-status',	help='Print subdevice status.',			action='store_true')
-	parser.add_argument('-g', '--gc',		help='Invoke GC before printing status.',	action='store_true')
-	args = parser.parse_args()
+    global SYSFS_BCACHE_PATH
+    global uuid_map
+    stats = set()
+    reset_stats = False
+    print_subdevices = False
+    run_gc = False
 
-	if args.help:
-		parser.print_help()
-		return 0
+    parser = _arg_parser()
+    args = parser.parse_args()
 
-	if args.five_minute:
-		stats.add('five_minute')
-	if args.hour:
-		stats.add('hour')
-	if args.day:
-		stats.add('day')
-	if args.total:
-		stats.add('total')
-	if args.all:
-		stats.add('five_minute')
-		stats.add('hour')
-		stats.add('day')
-		stats.add('total')
-	if args.reset_stats:
-		reset_stats = True
-	if args.sub_status:
-		print_subdevices = True
-	if args.gc:
-		run_gc = True
+    if args.help:
+    	parser.print_help()
+    	return 0
 
-	if not stats:
-		stats.add('total')
+    if args.five_minute:
+    	stats.add('five_minute')
+    if args.hour:
+    	stats.add('hour')
+    if args.day:
+    	stats.add('day')
+    if args.total:
+    	stats.add('total')
+    if args.all:
+    	stats.add('five_minute')
+    	stats.add('hour')
+    	stats.add('day')
+    	stats.add('total')
+    if args.reset_stats:
+    	reset_stats = True
+    if args.sub_status:
+    	print_subdevices = True
+    if args.gc:
+    	run_gc = True
 
-	uuid_map = map_uuid_to_device()
-	if not os.path.isdir(SYSFS_BCACHE_PATH):
-		print('bcache is not loaded.')
-		return
-	for cache in os.listdir(SYSFS_BCACHE_PATH):
-		if not os.path.isdir('%s%s' % (SYSFS_BCACHE_PATH, cache)):
-			continue
+    if not stats:
+    	stats.add('total')
 
-		if run_gc:
-			with open('%s%s/internal/trigger_gc' % (SYSFS_BCACHE_PATH, cache), 'w') as fd:
-				fd.write('1\n')
+    uuid_map = map_uuid_to_device()
+    if not os.path.isdir(SYSFS_BCACHE_PATH):
+    	print('bcache is not loaded.')
+    	return
+    for cache in os.listdir(SYSFS_BCACHE_PATH):
+    	if not os.path.isdir('%s%s' % (SYSFS_BCACHE_PATH, cache)):
+    		continue
 
-		dump_bcache('%s%s' % (SYSFS_BCACHE_PATH, cache), stats, print_subdevices, uuid_map.get(cache, '?'))
+    	if run_gc:
+    		with open('%s%s/internal/trigger_gc' % (SYSFS_BCACHE_PATH, cache), 'w') as fd:
+    			fd.write('1\n')
 
-		if reset_stats:
-			with open('%s%s/clear_stats' % (SYSFS_BCACHE_PATH, cache), 'w') as fd:
-				fd.write('1\n')
+    	dump_bcache('%s%s' % (SYSFS_BCACHE_PATH, cache), stats, print_subdevices, uuid_map.get(cache, '?'))
+
+    	if reset_stats:
+	    	with open('%s%s/clear_stats' % (SYSFS_BCACHE_PATH, cache), 'w') as fd:
+	    		fd.write('1\n')
 
 if __name__ == '__main__':
-	main()
+    main()
