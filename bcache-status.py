@@ -292,6 +292,12 @@ def map_uuid_to_device():
 	return ret
 
 
+def _bcache_loaded():
+    if not os.path.isdir(SYSFS_BCACHE_PATH):
+    	return False
+    return True
+
+
 def _arg_parser():
     'Contruct arg parser'
 
@@ -343,10 +349,13 @@ def main():
 
     parser = _arg_parser()
     args = parser.parse_args()
-
     if args.help:
     	parser.print_help()
     	return 0
+
+    if (not _bcache_loaded()):
+        print('Module bcache is not loaded.')
+        exit(0)
 
     if args.five_minute:
     	stats.add('five_minute')
@@ -372,9 +381,6 @@ def main():
     	stats.add('total')
 
     uuid_map = map_uuid_to_device()
-    if not os.path.isdir(SYSFS_BCACHE_PATH):
-    	print('bcache is not loaded.')
-    	return
     for cache in os.listdir(SYSFS_BCACHE_PATH):
     	if not os.path.isdir('%s%s' % (SYSFS_BCACHE_PATH, cache)):
     		continue
