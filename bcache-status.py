@@ -46,7 +46,7 @@ def _file_to_line(fname):
     'read single line of sysfs attribute file'
     lines = _file_to_lines(fname)
     if lines:
-        return ret[0].strip()
+        return lines[0].strip()
     return ''
 
 
