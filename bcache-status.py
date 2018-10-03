@@ -326,11 +326,11 @@ def scan_backing_devs():
     return backing_devs
 
 
-def  scan_cache_sets():
+def scan_cache_sets():
     '''
     recognize cache_set(s) in the system
 
-    return list of tuples ('CSET-UUID', 'cache device(s)')
+    return list of tuples ('CSET-UUID', 'cache device')
     '''
 
     cache_sets = []
@@ -345,6 +345,33 @@ def  scan_cache_sets():
             cache_sets.append((bdev, m.group(1)))
 
     return cache_sets
+
+
+def bcache_topology(cache_sets, backing_devs):
+    '''
+    construct map of cache_set <-> backing devs
+
+    return dict of lists like
+        'CSET-UUID' : ['cache dev name', 'backing dev name : bcacheN', ...]
+        'uncached' : ['backing dev name : bcacheN', ...]
+    '''
+
+    topology = {}
+    
+    for cset_uuid, cache_dev in cache_sets:
+        topology[cset_uuid] = [cache_dev]
+        for item in backing_devs:
+            if item[2] == cset_uuid:
+                topology[cset_uuid].append('%s : %s' % (item[1], item[0]))
+
+    topology['uncached'] = []
+    for item in backing_devs:
+        if item[2] == 'uncached':
+            topology['uncached'].append('%s : %s' % (item[1], item[0]))
+    if len(topology['uncached']) == 0:
+        del topology['uncached']
+
+    return topology
 
 
 def bcache_loaded():
@@ -395,7 +422,6 @@ def arg_parser():
 def main():
     'entry point'
 
-    global SYSFS_BCACHE_PATH
     global uuid_map
     stats = set()
     reset_stats = False
@@ -412,8 +438,11 @@ def main():
         print('Module bcache is not loaded.')
         exit(0)
 
-    print(scan_backing_devs())
-    print(scan_cache_sets())
+    backing_devs = scan_backing_devs()
+    cache_sets = scan_cache_sets()
+    print(backing_devs)
+    print(cache_sets)
+    print(bcache_topology(cache_sets, backing_devs))
 
     if args.five_minute:
     	stats.add('five_minute')
