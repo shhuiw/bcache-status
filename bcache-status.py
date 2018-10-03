@@ -350,6 +350,8 @@ def scan_cache_sets():
 def bcache_topology(cache_sets, backing_devs):
     '''
     construct map of cache_set <-> backing devs
+    @cache_sets : list of tuples ('CSET-UUID', 'cache device')
+    @backing_devs : list of tuples like ('bcacheN', 'sdX', 'CSET-UUID' or 'uncached')
 
     return dict of lists like
         'CSET-UUID' : ['cache dev name', 'backing dev name : bcacheN', ...]
@@ -372,6 +374,37 @@ def bcache_topology(cache_sets, backing_devs):
         del topology['uncached']
 
     return topology
+
+
+def dump_topology(topology):
+    '''
+    Print bcache topology in the system
+
+    @topology: dict of lists like
+                'CSET-UUID' : ['cache dev name', 'backing dev name : bcacheN', ...]
+                'uncached' : ['backing dev name : bcacheN', ...]
+    '''
+
+    '%36s : %16s'
+    print('%-60s  backing dev(s)' % 'cache_set')
+    print('-'*60 + '  ' + '-'*16)
+    for cset_uuid in topology:
+        item = topology[cset_uuid]
+        if cset_uuid != 'uncached':
+            print('%-36s : %-20s  ' % (cset_uuid, item[0]), end='')
+            if len(item) == 1:
+                print(' (None)')
+            else:
+                for i in item[1:-2]:
+                    print(' %s ,' % i, end='')
+                print(' %s' % item[-1])
+
+    if 'uncached' in topology:
+        item = topology['uncached']
+        print('%-60s ' % 'uncached', end='')
+        for i in item[1:-2]:
+             print(' %s ,' % i, end='')
+        print(' %s' % item[-1])
 
 
 def bcache_loaded():
@@ -442,7 +475,8 @@ def main():
     cache_sets = scan_cache_sets()
     print(backing_devs)
     print(cache_sets)
-    print(bcache_topology(cache_sets, backing_devs))
+    topology = bcache_topology(cache_sets, backing_devs)
+    dump_topology(topology)
 
     if args.five_minute:
     	stats.add('five_minute')
