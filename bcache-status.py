@@ -19,7 +19,9 @@
 
 
 import os
+import os.path
 import sys
+import re
 import errno
 import argparse
 
@@ -291,14 +293,46 @@ def map_uuid_to_device():
 		ret[basename] = _file_to_line('%s%s/dev' % (SYSFS_BLOCK_PATH, bdev))
 	return ret
 
+def scan_backing_devs():
+    '''
+    recognize backing devices "bcacheN" in the system
 
-def _bcache_loaded():
+    return list of tuples like ('bcacheN', 'sdX', 'CSET-UUID' or 'uncached')
+    '''
+    
+    backing_devs = []
+    p_bdi = re.compile(r'/block/([\w|\W|\/]+)/bcache')
+
+    for bdev in os.listdir(SYSFS_BLOCK_PATH):
+
+        if bdev.startswith('bcache'):
+            path = '%s%s/bcache' % (SYSFS_BLOCK_PATH, bdev)
+            cs_path = '%s/cache' % path
+
+            real = os.path.realpath(path)
+            m = p_bdi.search(real)
+
+            if os.path.exists(cs_path):
+                backing_devs.append(
+                        (
+                            bdev,
+                            m.group(1),
+                            os.path.basename(os.path.realpath(cs_path))
+                        )
+                    )
+            else:
+                backing_devs.append((bdev, m.group(1), 'uncached'))
+
+    return backing_devs
+
+
+def bcache_loaded():
     if not os.path.isdir(SYSFS_BCACHE_PATH):
     	return False
     return True
 
 
-def _arg_parser():
+def arg_parser():
     'Contruct arg parser'
 
     parser = argparse.ArgumentParser(add_help=False)
@@ -347,15 +381,17 @@ def main():
     print_subdevices = False
     run_gc = False
 
-    parser = _arg_parser()
+    parser = arg_parser()
     args = parser.parse_args()
     if args.help:
     	parser.print_help()
     	return 0
 
-    if (not _bcache_loaded()):
+    if not bcache_loaded():
         print('Module bcache is not loaded.')
         exit(0)
+
+    print(scan_backing_devs())
 
     if args.five_minute:
     	stats.add('five_minute')
