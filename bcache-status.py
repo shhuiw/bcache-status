@@ -31,6 +31,8 @@ DEV_BLOCK_PATH		= '/dev/block/'
 SYSFS_BCACHE_PATH	= '/sys/fs/bcache/'
 SYSFS_BLOCK_PATH	= '/sys/block/'
 
+UUID_LEN                = 36    # 8-4-4-4-12, 32 chars + 4 '-'s
+
 
 def _file_to_lines(fname):
     'read content of sysfs attribute file to lines'
@@ -293,6 +295,7 @@ def map_uuid_to_device():
 		ret[basename] = _file_to_line('%s%s/dev' % (SYSFS_BLOCK_PATH, bdev))
 	return ret
 
+
 def scan_backing_devs():
     '''
     recognize backing devices "bcacheN" in the system
@@ -304,14 +307,11 @@ def scan_backing_devs():
     p_bdi = re.compile(r'/block/([\w|\W|\/]+)/bcache')
 
     for bdev in os.listdir(SYSFS_BLOCK_PATH):
-
         if bdev.startswith('bcache'):
             path = '%s%s/bcache' % (SYSFS_BLOCK_PATH, bdev)
             cs_path = '%s/cache' % path
-
             real = os.path.realpath(path)
             m = p_bdi.search(real)
-
             if os.path.exists(cs_path):
                 backing_devs.append(
                         (
@@ -324,6 +324,27 @@ def scan_backing_devs():
                 backing_devs.append((bdev, m.group(1), 'uncached'))
 
     return backing_devs
+
+
+def  scan_cache_sets():
+    '''
+    recognize cache_set(s) in the system
+
+    return list of tuples ('CSET-UUID', 'cache device(s)')
+    '''
+
+    cache_sets = []
+    p_cache = re.compile(r'/block/([\w|\W|\/]+)/bcache')
+
+    for bdev in os.listdir(SYSFS_BCACHE_PATH):
+        if len(bdev) == UUID_LEN:
+            # one cache_set contains one cache device only currently
+            path = '%s/%s/cache0' % (SYSFS_BCACHE_PATH, bdev)
+            real = os.path.realpath(path)
+            m = p_cache.search(real)
+            cache_sets.append((bdev, m.group(1)))
+
+    return cache_sets
 
 
 def bcache_loaded():
@@ -392,6 +413,7 @@ def main():
         exit(0)
 
     print(scan_backing_devs())
+    print(scan_cache_sets())
 
     if args.five_minute:
     	stats.add('five_minute')
