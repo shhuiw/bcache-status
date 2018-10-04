@@ -281,19 +281,18 @@ def dump_bcache(bcache_sysfs_path, stats, print_subdevices, device):
 			dump_cachedev('%s/%s' % (bcache_sysfs_path, obj))
 
 def map_uuid_to_device():
-	'''Map bcache UUIDs to device files.'''
-	global SYSFS_BLOCK_PATH
-	ret = {}
+    '''Map bcache UUIDs to device files.'''
+    ret = {}
 
-	if not os.path.isdir(SYSFS_BLOCK_PATH):
-		return ret
-	for bdev in os.listdir(SYSFS_BLOCK_PATH):
-		link = '%s%s/bcache/cache' % (SYSFS_BLOCK_PATH, bdev)
-		if not os.path.islink(link):
-			continue
-		basename = os.path.basename(os.readlink(link))
-		ret[basename] = _file_to_line('%s%s/dev' % (SYSFS_BLOCK_PATH, bdev))
-	return ret
+    if not os.path.isdir(SYSFS_BLOCK_PATH):
+        return ret
+    for bdev in os.listdir(SYSFS_BLOCK_PATH):
+        link = '%s%s/bcache/cache' % (SYSFS_BLOCK_PATH, bdev)
+        if not os.path.islink(link):
+            continue
+        basename = os.path.basename(os.readlink(link))
+        ret[basename] = _file_to_line('%s%s/dev' % (SYSFS_BLOCK_PATH, bdev))
+    return ret
 
 
 def scan_backing_devs():
@@ -350,8 +349,8 @@ def scan_cache_sets():
 def bcache_topology(cache_sets, backing_devs):
     '''
     construct map of cache_set <-> backing devs
-    @cache_sets : list of tuples ('CSET-UUID', 'cache device')
-    @backing_devs : list of tuples like ('bcacheN', 'sdX', 'CSET-UUID' or 'uncached')
+    @cache_sets     : list of tuples ('CSET-UUID', 'cache device')
+    @backing_devs   : list of tuples like ('bcacheN', 'sdX', 'CSET-UUID' or 'uncached')
 
     return dict of lists like
         'CSET-UUID' : ['cache dev name', 'backing dev name : bcacheN', ...]
@@ -381,11 +380,11 @@ def dump_topology(topology):
     Print bcache topology in the system
 
     @topology: dict of lists like
-                'CSET-UUID' : ['cache dev name', 'backing dev name : bcacheN', ...]
-                'uncached' : ['backing dev name : bcacheN', ...]
+                    'CSET-UUID' : ['cache dev name', 'backing dev name : bcacheN', ...]
+                    'uncached' : ['backing dev name : bcacheN', ...]
     '''
 
-    '%36s : %16s'
+    # %36s : %16s
     print('%-60s  backing dev(s)' % 'cache_set')
     print('-'*60 + '  ' + '-'*16)
     for cset_uuid in topology:
@@ -407,14 +406,14 @@ def dump_topology(topology):
         print(' %s' % item[-1])
 
 
-def bcache_loaded():
+def bcache_module_loaded():
     if not os.path.isdir(SYSFS_BCACHE_PATH):
     	return False
     return True
 
 
-def arg_parser():
-    'Contruct arg parser'
+def args_parser():
+    'construct argparser to parse command line'
 
     parser = argparse.ArgumentParser(add_help=False)
 
@@ -452,6 +451,33 @@ def arg_parser():
     return parser
 
 
+def stats_options(args):
+    '''
+    @args   : argparse.ArgumentParser().parse_args()
+    return  : set of selected options about stats
+    '''
+    options = set()
+
+    if args.five_minute:
+    	options.add('five_minute')
+    if args.hour:
+    	options.add('hour')
+    if args.day:
+    	options.add('day')
+    if args.total:
+    	options.add('total')
+    if args.all:
+    	options.add('five_minute')
+    	options.add('hour')
+    	options.add('day')
+    	options.add('total')
+
+    if not options:
+    	options.add('total')
+
+    return options
+
+
 def main():
     'entry point'
 
@@ -461,36 +487,18 @@ def main():
     print_subdevices = False
     run_gc = False
 
-    parser = arg_parser()
+    parser = args_parser()
     args = parser.parse_args()
     if args.help:
     	parser.print_help()
-    	return 0
+    	exit(0)
 
-    if not bcache_loaded():
+    if not bcache_module_loaded():
         print('Module bcache is not loaded.')
         exit(0)
 
-    backing_devs = scan_backing_devs()
-    cache_sets = scan_cache_sets()
-    print(backing_devs)
-    print(cache_sets)
-    topology = bcache_topology(cache_sets, backing_devs)
-    dump_topology(topology)
+    stats = stats_options(args)
 
-    if args.five_minute:
-    	stats.add('five_minute')
-    if args.hour:
-    	stats.add('hour')
-    if args.day:
-    	stats.add('day')
-    if args.total:
-    	stats.add('total')
-    if args.all:
-    	stats.add('five_minute')
-    	stats.add('hour')
-    	stats.add('day')
-    	stats.add('total')
     if args.reset_stats:
     	reset_stats = True
     if args.sub_status:
@@ -498,8 +506,18 @@ def main():
     if args.gc:
     	run_gc = True
 
-    if not stats:
-    	stats.add('total')
+
+    # list of tuples like ('bcacheN', 'sdX', 'CSET-UUID' or 'uncached')
+    backing_devs = scan_backing_devs()
+    # list of tuples ('CSET-UUID', 'cache device')
+    cache_sets = scan_cache_sets()
+    print(backing_devs)
+    print(cache_sets)
+    # dict of lists like
+    #       'CSET-UUID' : ['cache dev name', 'backing dev name : bcacheN', ...]
+    #       'uncached' : ['backing dev name : bcacheN', ...]
+    topology = bcache_topology(cache_sets, backing_devs)
+    dump_topology(topology)
 
     uuid_map = map_uuid_to_device()
     for cache in os.listdir(SYSFS_BCACHE_PATH):
