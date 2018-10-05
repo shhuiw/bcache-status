@@ -478,26 +478,10 @@ def stats_options(args):
     return options
 
 
-def main():
-    'entry point'
-
-    global uuid_map
-    stats = set()
+def flags_options(args):
     reset_stats = False
     print_subdevices = False
     run_gc = False
-
-    parser = args_parser()
-    args = parser.parse_args()
-    if args.help:
-    	parser.print_help()
-    	exit(0)
-
-    if not bcache_module_loaded():
-        print('Module bcache is not loaded.')
-        exit(0)
-
-    stats = stats_options(args)
 
     if args.reset_stats:
     	reset_stats = True
@@ -506,6 +490,26 @@ def main():
     if args.gc:
     	run_gc = True
 
+    return reset_stats, print_subdevices, run_gc
+
+
+def main():
+    'entry point'
+
+    global uuid_map
+
+    parser = args_parser()
+    args = parser.parse_args()
+    if args.help:
+    	parser.print_help()
+    	exit(0)
+
+    stats = stats_options(args)
+    reset_stats, print_subdevices, run_gc = flags_options(args)
+
+    if not bcache_module_loaded():
+        print('Module bcache is not loaded.')
+        exit(0)
 
     # list of tuples like ('bcacheN', 'sdX', 'CSET-UUID' or 'uncached')
     backing_devs = scan_backing_devs()
